@@ -1,0 +1,7 @@
+todos
+
+fix code book up
+
+add observation number to the data reading function
+
+flatten / tidy
