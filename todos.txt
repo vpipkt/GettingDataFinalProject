@@ -5,3 +5,9 @@ fix code book up
 add observation number to the data reading function
 
 flatten / tidy
+
+summarize
+
+check over the five steps, make sure you got them all
+
+make readme.
