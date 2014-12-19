@@ -8,52 +8,87 @@
 
 
 
-#X_train is time stamps?
-#Y_train maps to the activity states.
-
+# ==========================  Pre steps ==========================
 
 activity.labels<- read.table("activity_labels.txt")
 names(activity.labels) <- c("activity.code","activity")
 
 features <- read.table("features.txt",col.names=c("col.number","variable"))
 
-tt <- "test"
-
+#define function to combine x, y, and subject ID for a given subset
 getHARdata <- function(testOrTraining="test"){
     
+    dir<-testOrTraining
+    
+    #check we are in the HAR dataset folder
+    if(!file_test("-d",dir))
+    {
+        #try going up a directory
+        if(file_test("-d",file.path("..",dir)))
+        {
+           dir<- file.path("..",dir)               
+        }else if(file_test("-d",file.path("UCI HAR Dataset",dir)))
+        {
+            #down a directory from the top of the zip archive
+            dir<-file.path("UCI HAR Dataset",dir)
+        }
+    }
     #read x, y, and subject ID
-    path<- paste(testOrTraining,"/subject_",testOrTraining,".txt",sep="")
-    print(path)
+    path<- paste(dir,"/subject_",testOrTraining,".txt",sep="")
+    print(paste("Reading file:", path))
     subj <- read.table(path,col.names= "subject.id")
     subj$part <- testOrTraining
+    subj$obs <- seq_len(nrow(subj))
     
-    path <-paste(testOrTraining,"/y_",testOrTraining,".txt",sep="")
-    print(path)
+    path <-paste(dir,"/y_",testOrTraining,".txt",sep="")
+    print(paste("Reading file:", path))
     y <- read.table(path,col.names="activity.code") 
         
-    path <- paste(testOrTraining,"/X_",testOrTraining,".txt",sep="")
-    print(path)
+    path <- paste(dir,"/X_",testOrTraining,".txt",sep="")
+    print(paste("Reading file:", path))
     x <- read.table(path, col.names=features$variable)
     
     
     return(cbind(subj,y,x))
 }
 
-har.data <- rbind(getHARdata("test"),getHARdata("train"))
+# ==========================  Step 1 ==========================
+#stack the two datasets using rbind
+
+har.data <- rbind(getHARdata("test"), getHARdata("train"))
 
 nrow(har.data) #expecting 10299
-ncol(har.data) #expecting 564
-names(har.data)[grep("mean",names(har.data))]
+ncol(har.data) #expecting 565
 
 
-##Step 2
-#  review this against features_info.txt
-names(har.data)[grep("mean.",names(har.data),fixed=T)]
-names(har.data)[grep("std",names(har.data))]
+# ==========================  Step 2 ==========================
+#extract columns based on names; 
+#intentionally excluding signal window averages e.g. angle(tBodyAccJerkMean),gravityMean)
+#intentionally excluding frequency means 
+mean.cols<- grep("mean.",names(har.data),fixed=T)
+std.cols<- grep("std",names(har.data))
 
+#  review selections against features_info.txt
+names(har.data)[mean.cols]
+names(har.data)[std.cols]
 
+#combine these with the identifying variables
+cols<- c(1:4, mean.cols,std.cols)
+cols <- cols[order(cols)]
 
-#step 3
-y$activity <- cut(y$activity.code,breaks=0.5+c(0:6),
+#final check; expecting 4 ID vars and  66 measure vars
+names(har.data)[cols]
+
+#subset only desired columns
+har.data <- har.data[,cols]
+
+# ==========================  Step 3 ==========================
+har.data$activity <- cut(har.data$activity.code,breaks=0.5+c(0:6),
                   labels=activity.labels$activity)
-# table(y)
+table(har.data[,c("activity","activity.code")]) #check
+
+#as a sanity check, does each participant do each activity?
+table(har.data[,c("activity","subject.id")])
+
+
+# ==========================  Step 4 ==========================
