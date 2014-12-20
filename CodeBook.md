@@ -1,6 +1,3 @@
----
-output: html_document
----
 
 # Human Activity Recognition Code Book
 
