@@ -1,4 +1,5 @@
-#This script gathers and cleans the Samsung [blah] data if it is in the working directory), producing a tidy data set in `objectname`.
+#This script gathers and cleans the human activity recognition data if it is in the working directory), producing a tidy data set summary called `har.summary`. Details about the process are in the README.md. Details about the data are in CodeBook.md.
+
 #
 # 1. Merges the training and the test sets to create one data set.
 # 2. Extracts only the measurements on the mean and standard deviation for each measurement. 
@@ -92,3 +93,57 @@ table(har.data[,c("activity","subject.id")])
 
 
 # ==========================  Step 4 ==========================
+
+# to get better names, start with the variable names
+orig.names <- names(har.data)[5:70]
+orig.names #as above expect 66 names
+
+#split out first letter, it is the time (t) or frequency (f)
+var.names <- data.frame(orig.names=orig.names,
+                        time.freq = substr(orig.names,1,1))
+var.names$TimeFreq[var.names$time.freq =="t"] <-"Time"
+var.names$TimeFreq[var.names$time.freq =="f"] <-"Frequency"
+var.names$time.freq<-NULL
+#Get the sensor
+var.names$Sensor <- "Accelerometer"
+var.names$Sensor[grep("Gyro",orig.names)] <- "Gyroscope"
+#Is the measure relative to the body or gravity (accelaration only)
+var.names$Body <- "Body"
+var.names$Body[grep("Gravity",orig.names)] <-"Gravity"
+#which vector component is it (x,y,z) or is it the magnitude (scalar)
+var.names$Vector <- substr(orig.names,nchar(orig.names),nchar(orig.names))
+var.names$Vector[var.names$Vector=="."] <- "Magnitude"
+
+#Infer from the sensor and presence of "Jerk" what is being measured
+var.names$Measure <- ""
+var.names$Measure[var.names$Sensor=="Accelerometer"] <- "Linear.acceleration"
+var.names$Measure[var.names$Sensor=="Accelerometer" & 
+                      grepl("Jerk",orig.names)] <- "Linear.jerk"
+var.names$Measure[var.names$Sensor=="Gyroscope"] <- "Angular.velocy"
+var.names$Measure[var.names$Sensor=="Gyroscope" & 
+                      grepl("Jerk",orig.names)] <- "Angular.jerk"
+
+#Which summary statistic is applied?
+var.names$Stat<-"Mean"
+var.names$Stat[grepl("std",orig.names)] <- "Standard.deviation"
+
+#Define a "grammar" of the various name elements.
+var.names$Plain.Name <- with(var.names,
+                           paste(TimeFreq,Stat,Body,Measure,Vector,sep="."))
+
+#
+names(har.data)[5:70] <- var.names$Plain.Name
+# ==========================  Step 5 ==========================
+
+library(reshape2)
+har.summary <- dcast(
+            melt(har.data,id.vars=c("activity","activity.code","subject.id","part","obs")),
+            subject.id + activity ~ variable, mean)
+
+#expect this number of rows, if all subjects did each activity
+length(unique(har.data$subject.id)) * length(levels(har.data$activity))
+#got this 
+nrow(har.summary)
+
+#write the file out
+write.table(har.summary,"tidyHARsummary.txt",row.names=FALSE)
